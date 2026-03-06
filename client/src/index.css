@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --apm-bg:
+    radial-gradient(circle at top left, rgba(122, 227, 255, 0.18), transparent 26%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 30%),
+    linear-gradient(180deg, #071019 0%, #091521 100%);
+}
+
+html {
+  background: #071019;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--apm-bg);
+  color: #eff7ff;
+  font-family: "Sora", "IBM Plex Sans", "Pretendard", sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+#root {
+  isolation: isolate;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}

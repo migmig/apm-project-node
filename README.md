@@ -1,6 +1,6 @@
 # apm-project-node
 
-`gcgf-untact`의 `apm-agent`가 보내는 데이터를 받아 저장하고, 브라우저 대시보드에서 실시간으로 보여주는 Node 기반 APM 서버입니다.
+`gcgf-untact`의 `apm-agent`가 보내는 데이터를 받아 저장하고, React 대시보드에서 실시간으로 보여주는 Node 기반 APM 서버입니다.
 
 ## 제공 기능
 
@@ -13,12 +13,14 @@
 - `GET /api/v1/traces` 로 trace 검색
 - `GET /api/v1/traces/:traceId` 로 trace 상세 조회
 - `GET /api/v1/api-detail?appName=...&uri=...` 로 API 상세 조회
-- `/` 에서 상단 탭 기반 실시간 모니터링 UI 제공
+- `/` 에서 `React + Vite + Tailwind` 기반 실시간 모니터링 UI 제공
 
 ## 실행
 
 ```bash
 cd /Users/migmig/IdeaProjects/apm-project-node
+npm install
+npm run build
 npm start
 ```
 
@@ -29,6 +31,12 @@ npm start
 - `PORT`: 서버 포트
 - `HOST`: 바인드 주소
 - `APM_API_KEY`: 설정 시 `X-API-Key` 헤더 검증
+
+개발용 스크립트:
+
+- `npm run dev:client`: Vite 프론트엔드 개발 서버
+- `npm run dev:server`: Node APM 서버 watch 모드
+- `npm run build`: React 프론트엔드 빌드 후 `dist/` 생성
 
 ## apm-agent 연동
 
@@ -69,7 +77,7 @@ apm.agent.api-key=
 
 ## 현재 대시보드 표시 항목
 
-- `Dashboard` 탭: 앱 요약, 최근 trace, 주요 지표
+- `Dashboard` 탭: 앱 요약, 최근 trace, 주요 지표 차트
 - `APIs` 탭: URI 목록과 API 상세 화면
 - `SQL` 탭: SQL 문장 기준 검색과 SQL 상세 화면
 - `Traces` 탭: traceId, URI, duration 기준 검색과 trace 상세 화면
@@ -77,5 +85,6 @@ apm.agent.api-key=
 ## 한계
 
 - 현재 저장소는 파일 기반 JSONL 입니다.
+- 서버가 UI를 서빙하려면 먼저 `npm run build` 로 `dist/`를 생성해야 합니다.
 - 재시작 후 대시보드는 과거 파일을 재적재하지 않고 새로 들어오는 데이터부터 집계합니다.
 - 인증은 단일 API 키 헤더 검증만 제공합니다.

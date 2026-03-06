@@ -1,4 +1,6 @@
 data/
+dist/
+node_modules/
 /.idea/.gitignore
 /.idea/apm-project-node.iml
 /.idea/copilot.data.migration.agent.xml

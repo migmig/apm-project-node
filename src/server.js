@@ -8,7 +8,7 @@ import { ApmState } from "./state.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
-const publicDir = path.join(rootDir, "public");
+const distDir = path.join(rootDir, "dist");
 const dataDir = path.join(rootDir, "data");
 
 const port = Number(process.env.PORT || 9900);
@@ -23,8 +23,12 @@ const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".png": "image/png",
+  ".woff2": "font/woff2"
 };
 
 function sendJson(response, statusCode, payload) {
@@ -86,9 +90,9 @@ function parseBody(request) {
 async function serveStatic(request, response, pathname) {
   const targetPath = pathname === "/" ? "/index.html" : pathname;
   const safePath = path.normalize(targetPath).replace(/^(\.\.[/\\])+/, "");
-  const filePath = path.join(publicDir, safePath);
+  const filePath = path.join(distDir, safePath);
 
-  if (!filePath.startsWith(publicDir)) {
+  if (!filePath.startsWith(distDir)) {
     sendText(response, 403, "Forbidden");
     return;
   }
@@ -108,6 +112,20 @@ async function serveStatic(request, response, pathname) {
     });
     response.end(content);
   } catch {
+    if (!path.extname(safePath)) {
+      try {
+        const content = await readFile(path.join(distDir, "index.html"));
+        response.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8"
+        });
+        response.end(content);
+        return;
+      } catch {
+        sendText(response, 404, "Frontend build not found. Run `npm run build` first.");
+        return;
+      }
+    }
+
     sendText(response, 404, "Not found");
   }
 }
@@ -286,7 +304,6 @@ const server = http.createServer(async (request, response) => {
 });
 
 async function start() {
-  await mkdir(publicDir, { recursive: true });
   await storage.init();
   server.listen(port, host, () => {
     console.log(`APM server listening on http://${host}:${port}`);
