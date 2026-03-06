@@ -322,11 +322,8 @@ export default function App() {
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">Node APM Control Room</p>
           <h1 className="mt-3 max-w-[12ch] text-4xl font-semibold tracking-tight text-white md:text-6xl">
-            React and Tailwind monitoring console
+            EasyOne APM Dashboard
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-            대시보드는 요약을 유지하고, API와 SQL, Trace는 각각 독립 탭에서 상세 탐색합니다.
-          </p>
         </div>
         <div className="grid content-end gap-4">
           <StatusBadge tone={connectionState === "streaming" ? "positive" : connectionState === "failed" ? "negative" : "neutral"}>

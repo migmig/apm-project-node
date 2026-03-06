@@ -1,6 +1,6 @@
 # apm-project-node
 
-`gcgf-untact`의 `apm-agent`가 보내는 데이터를 받아 저장하고, React 대시보드에서 실시간으로 보여주는 Node 기반 APM 서버입니다.
+`gcgf-untact`의 `apm-agent`가 보내는 데이터를 받아 저장하고, React 대시보드에서 실시간으로 보여주는 Bun 기반 APM 서버입니다.
 
 ## 제공 기능
 
@@ -19,9 +19,9 @@
 
 ```bash
 cd /Users/migmig/IdeaProjects/apm-project-node
-npm install
-npm run build
-npm start
+bun install
+bun run build
+bun start
 ```
 
 기본 바인드 주소는 `127.0.0.1`, 포트는 `9900` 입니다.
@@ -34,9 +34,18 @@ npm start
 
 개발용 스크립트:
 
-- `npm run dev:client`: Vite 프론트엔드 개발 서버
-- `npm run dev:server`: Node APM 서버 watch 모드
-- `npm run build`: React 프론트엔드 빌드 후 `dist/` 생성
+- `bun run dev:client`: Vite 프론트엔드 개발 서버
+- `bun run dev:server`: Bun 서버 watch 모드
+- `bun run build`: React 프론트엔드 빌드 후 `dist/` 생성
+- `bun start`: Bun 런타임으로 APM 서버 실행
+
+기본 Bun 경로는 `$HOME/.bun/bin/bun` 으로 가정합니다.
+다른 위치에 설치했다면 `BUN_BIN=/path/to/bun bun start` 형태로 실행할 수 있습니다.
+
+Node 호환 스크립트:
+
+- `npm run start:node`
+- `npm run dev:server:node`
 
 ## apm-agent 연동
 
@@ -85,6 +94,6 @@ apm.agent.api-key=
 ## 한계
 
 - 현재 저장소는 파일 기반 JSONL 입니다.
-- 서버가 UI를 서빙하려면 먼저 `npm run build` 로 `dist/`를 생성해야 합니다.
+- 서버가 UI를 서빙하려면 먼저 `bun run build` 로 `dist/`를 생성해야 합니다.
 - 재시작 후 대시보드는 과거 파일을 재적재하지 않고 새로 들어오는 데이터부터 집계합니다.
 - 인증은 단일 API 키 헤더 검증만 제공합니다.
