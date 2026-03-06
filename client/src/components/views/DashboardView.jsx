@@ -5,6 +5,8 @@ import MetricCard from "../ui/MetricCard.jsx";
 import StatusBadge from "../ui/StatusBadge.jsx";
 import Table from "../ui/Table.jsx";
 
+import { cx } from "../../lib/cx.js";
+
 export default function DashboardView({
   apps,
   currentApp,
@@ -12,10 +14,11 @@ export default function DashboardView({
   overviewCards,
   onOpenApis,
   onOpenTraces,
-  onOpenTrace
+  onOpenTrace,
+  onSelectApp
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {overviewCards.map((card) => (
           <MetricCard key={card.label} label={card.label} value={card.value} subValue={card.subValue} />
@@ -31,7 +34,14 @@ export default function DashboardView({
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {apps.map((app) => (
-            <article key={app.appName} className="rounded-[24px] border border-white/10 bg-white/4 p-5">
+            <article
+              key={app.appName}
+              onClick={() => onSelectApp(app.appName)}
+              className={cx(
+                "cursor-pointer rounded-[24px] border border-white/10 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl",
+                currentApp?.appName === app.appName ? "bg-white/10 ring-1 ring-cyan-300/50" : "bg-white/4"
+              )}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold text-white">{app.appName}</h3>
@@ -56,15 +66,21 @@ export default function DashboardView({
               <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => onOpenApis(app.appName)}
-                  className="rounded-2xl border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-100 transition hover:-translate-y-0.5 hover:bg-white/10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenApis(app.appName);
+                  }}
+                  className="rounded-2xl border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-100 transition-all hover:-translate-y-0.5 hover:bg-white/10 hover:shadow-md"
                 >
                   Open APIs
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpenTraces(app.appName)}
-                  className="rounded-2xl border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-100 transition hover:-translate-y-0.5 hover:bg-white/10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenTraces(app.appName);
+                  }}
+                  className="rounded-2xl border border-white/10 bg-white/6 px-4 py-2 text-sm text-slate-100 transition-all hover:-translate-y-0.5 hover:bg-white/10 hover:shadow-md"
                 >
                   Open Traces
                 </button>
@@ -116,7 +132,7 @@ export default function DashboardView({
             <tr
               key={trace.traceId}
               onClick={() => onOpenTrace(trace.traceId, trace.appName)}
-              className="cursor-pointer transition hover:bg-white/5"
+              className="cursor-pointer transition-colors duration-200 hover:bg-white/10"
             >
               <td className="px-4 py-3">{trace.appName}</td>
               <td className="px-4 py-3 font-mono text-cyan-200">{trace.traceId.slice(0, 12)}</td>
@@ -129,6 +145,6 @@ export default function DashboardView({
           ))}
         />
       </section>
-    </>
+    </div>
   );
 }

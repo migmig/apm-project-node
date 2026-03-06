@@ -13,7 +13,7 @@ export default function SqlView({
   onSwitchToTraceTab
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <section className="rounded-[28px] border border-white/10 bg-slate-950/55 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.30)] backdrop-blur-xl">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">SQL Explorer</p>
@@ -78,7 +78,7 @@ export default function SqlView({
             <tr
               key={trace.traceId}
               onClick={() => onOpenTrace(trace.traceId, trace.appName, "sql")}
-              className="cursor-pointer transition hover:bg-white/5"
+              className="cursor-pointer transition-colors duration-200 hover:bg-white/10"
             >
               <td className="px-4 py-3">{trace.appName}</td>
               <td className="px-4 py-3 font-mono text-cyan-200">{trace.traceId.slice(0, 12)}</td>
@@ -134,6 +134,6 @@ export default function SqlView({
           </div>
         )}
       </section>
-    </>
+    </div>
   );
 }
