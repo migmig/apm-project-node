@@ -1,0 +1,5 @@
+
+> apm-project-node@0.1.0 start:node
+> node src/server.js
+
+APM server listening on http://127.0.0.1:9900

@@ -39,7 +39,7 @@ export default function App() {
       <HeroHeader connectionState={connectionState} generatedAt={dashboard?.generatedAt} />
       <TabNav currentTab={currentTab} onChange={switchTab} />
 
-      <main className="mt-5 space-y-6">
+      <main className="mt-5 flex flex-col gap-6">
         {currentTab === "dashboard" ? (
           <DashboardView
             apps={apps}
@@ -49,6 +49,7 @@ export default function App() {
             onOpenApis={openAppApis}
             onOpenTrace={openTraceDetail}
             onOpenTraces={openAppTraces}
+            onSelectApp={setSelectedApp}
           />
         ) : null}
 

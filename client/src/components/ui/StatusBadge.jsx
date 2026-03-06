@@ -2,8 +2,8 @@ import { cx } from "../../lib/cx.js";
 
 export default function StatusBadge({ tone = "neutral", children }) {
   const tones = {
-    positive: "bg-emerald-300 text-emerald-950",
-    negative: "bg-rose-300 text-rose-950",
+    positive: "bg-emerald-400 text-emerald-950 shadow-[0_0_12px_rgba(52,211,153,0.3)] ring-1 ring-emerald-400/50",
+    negative: "bg-rose-400 text-rose-950 shadow-[0_0_12px_rgba(251,113,133,0.3)] ring-1 ring-rose-400/50",
     neutral: "border border-white/10 bg-white/5 text-slate-300"
   };
 
