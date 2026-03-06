@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 const MAX_SERIES_POINTS = 60;
 const MAX_RECENT_TRACES = 50;
 const MAX_GLOBAL_TRACES = 200;
+const MAX_TRACE_INDEX = 5000;
 const ONLINE_THRESHOLD_MS = 30_000;
 
 function trim(array, max) {
@@ -79,6 +80,10 @@ function seriesPoint(metric) {
 
 function sortByTimestampDesc(left, right) {
   return right.timestamp - left.timestamp;
+}
+
+function traceCompositeKey(appName, traceId) {
+  return `${appName}::${traceId}`;
 }
 
 export class ApmState extends EventEmitter {
@@ -249,7 +254,14 @@ export class ApmState extends EventEmitter {
       const item = normalizeTrace(trace, receivedAt);
       app.lastSeenAt = Math.max(app.lastSeenAt, item.timestamp);
       app.tracesReceived += 1;
-      this.traceIndex.set(item.traceId, item);
+      this.traceIndex.set(traceCompositeKey(item.appName, item.traceId), item);
+      while (this.traceIndex.size > MAX_TRACE_INDEX) {
+        const oldestKey = this.traceIndex.keys().next().value;
+        if (!oldestKey) {
+          break;
+        }
+        this.traceIndex.delete(oldestKey);
+      }
       app.recentTraces.unshift(item);
       trim(app.recentTraces, MAX_RECENT_TRACES);
       this.globalRecentTraces.unshift(item);
@@ -347,8 +359,18 @@ export class ApmState extends EventEmitter {
     };
   }
 
-  traceDetail(traceId) {
-    return this.traceIndex.get(traceId) || null;
+  traceDetail(appName, traceId) {
+    if (appName) {
+      return this.traceIndex.get(traceCompositeKey(appName, traceId)) || null;
+    }
+
+    for (const trace of this.traceIndex.values()) {
+      if (trace.traceId === traceId) {
+        return trace;
+      }
+    }
+
+    return null;
   }
 
   searchTraces(filters = {}) {

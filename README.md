@@ -12,6 +12,7 @@
 - `GET /api/v1/stream` SSE 스트림으로 대시보드 실시간 갱신
 - `GET /api/v1/traces` 로 trace 검색
 - `GET /api/v1/traces/:traceId` 로 trace 상세 조회
+- `GET /api/v1/apps/:appName/traces/:traceId` 로 앱 기준 trace 상세 조회
 - `GET /api/v1/api-detail?appName=...&uri=...` 로 API 상세 조회
 - `/` 에서 `React + Vite + Tailwind` 기반 실시간 모니터링 UI 제공
 
@@ -31,6 +32,8 @@ bun start
 - `PORT`: 서버 포트
 - `HOST`: 바인드 주소
 - `APM_API_KEY`: 설정 시 `X-API-Key` 헤더 검증
+
+`APM_API_KEY`를 설정한 경우, 브라우저 UI에서는 `?apiKey=...` 쿼리 파라미터로 인증값을 전달할 수 있습니다.
 
 개발용 스크립트:
 
@@ -112,4 +115,5 @@ apm.agent.api-key=
 - 현재 저장소는 파일 기반 JSONL 입니다.
 - 서버가 UI를 서빙하려면 먼저 `bun run build` 로 `dist/`를 생성해야 합니다.
 - 재시작 후 대시보드는 과거 파일을 재적재하지 않고 새로 들어오는 데이터부터 집계합니다.
-- 인증은 단일 API 키 헤더 검증만 제공합니다.
+- 인증은 API 키 기반 검증을 제공합니다(`X-API-Key` 헤더 또는 `apiKey` 쿼리).
+- trace 상세 인덱스는 메모리 보호를 위해 최신 5,000건까지만 유지합니다.

@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { tabs } from "../constants/dashboard.js";
 import { formatNumber, formatTime } from "../lib/format.js";
-import { fetchJson } from "../lib/fetch-json.js";
+import { fetchJson, withApiKey } from "../lib/fetch-json.js";
 
 function getHashTab() {
   const tab = window.location.hash.slice(1);
@@ -55,8 +55,10 @@ export function useApmDashboard() {
     return detail;
   }
 
-  async function fetchTraceDetail(traceId) {
-    const detail = await fetchJson(`/api/v1/traces/${encodeURIComponent(traceId)}`);
+  async function fetchTraceDetail(appName, traceId) {
+    const detail = await fetchJson(
+      `/api/v1/apps/${encodeURIComponent(appName)}/traces/${encodeURIComponent(traceId)}`
+    );
     startTransition(() => {
       setSelectedTraceDetail(detail);
       setSelectedApp(detail.appName);
@@ -115,8 +117,8 @@ export function useApmDashboard() {
     switchTab("apis");
   }
 
-  async function openTraceDetail(traceId, tabId = "traces") {
-    await fetchTraceDetail(traceId);
+  async function openTraceDetail(traceId, appName, tabId = "traces") {
+    await fetchTraceDetail(appName, traceId);
     switchTab(tabId);
   }
 
@@ -171,7 +173,7 @@ export function useApmDashboard() {
   }, []);
 
   useEffect(() => {
-    const stream = new EventSource("/api/v1/stream");
+    const stream = new EventSource(withApiKey("/api/v1/stream"));
 
     stream.addEventListener("snapshot", (event) => {
       const payload = JSON.parse(event.data);
