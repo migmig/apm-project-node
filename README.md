@@ -47,6 +47,22 @@ Node 호환 스크립트:
 - `npm run start:node`
 - `npm run dev:server:node`
 
+## Docker
+
+이미지 빌드:
+
+```bash
+docker build -t apm-project-node .
+```
+
+컨테이너 실행:
+
+```bash
+docker run --rm -p 9900:9900 -e HOST=0.0.0.0 -v "$(pwd)/data:/app/data" apm-project-node
+```
+
+컨테이너 내부에서는 `bun src/server.js` 로 서버가 실행되고, 수신 데이터는 `/app/data` 에 저장됩니다.
+
 ## apm-agent 연동
 
 `gcgf-untact` 애플리케이션 설정에서 다음처럼 맞추면 됩니다.

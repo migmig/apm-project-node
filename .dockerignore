@@ -1,0 +1,10 @@
+.git
+.gitignore
+.idea
+.codex
+node_modules
+dist
+data
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
