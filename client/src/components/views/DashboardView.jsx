@@ -115,7 +115,7 @@ export default function DashboardView({
           rows={(dashboard?.recentTraces || []).map((trace) => (
             <tr
               key={trace.traceId}
-              onClick={() => onOpenTrace(trace.traceId)}
+              onClick={() => onOpenTrace(trace.traceId, trace.appName)}
               className="cursor-pointer transition hover:bg-white/5"
             >
               <td className="px-4 py-3">{trace.appName}</td>

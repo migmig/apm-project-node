@@ -56,7 +56,9 @@ function authorized(request) {
   if (!expectedApiKey) {
     return true;
   }
-  return request.headers["x-api-key"] === expectedApiKey;
+  const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+  const queryApiKey = url.searchParams.get("apiKey") || "";
+  return request.headers["x-api-key"] === expectedApiKey || queryApiKey === expectedApiKey;
 }
 
 function parseBody(request) {
@@ -175,6 +177,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (!authorized(request) && pathname.startsWith("/api/v1/")) {
+      sendJson(response, 401, { error: "Unauthorized" });
+      return;
+    }
+
     if (pathname === "/api/v1/stream" && request.method === "GET") {
       response.writeHead(200, {
         "Content-Type": "text/event-stream",
@@ -213,7 +220,21 @@ const server = http.createServer(async (request, response) => {
 
     if (pathname.startsWith("/api/v1/traces/") && request.method === "GET") {
       const traceId = decodeURIComponent(pathname.slice("/api/v1/traces/".length));
-      const trace = state.traceDetail(traceId);
+      const appName = url.searchParams.get("appName") || "";
+      const trace = state.traceDetail(appName, traceId);
+      if (!trace) {
+        sendJson(response, 404, { error: "Trace not found" });
+        return;
+      }
+      sendJson(response, 200, trace);
+      return;
+    }
+
+    if (pathname.startsWith("/api/v1/apps/") && pathname.includes("/traces/") && request.method === "GET") {
+      const [encodedAppName, encodedTraceId] = pathname.slice("/api/v1/apps/".length).split("/traces/");
+      const appName = decodeURIComponent(encodedAppName || "");
+      const traceId = decodeURIComponent(encodedTraceId || "");
+      const trace = state.traceDetail(appName, traceId);
       if (!trace) {
         sendJson(response, 404, { error: "Trace not found" });
         return;
@@ -256,11 +277,6 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       sendJson(response, 200, snapshot);
-      return;
-    }
-
-    if (!authorized(request) && pathname.startsWith("/api/v1/")) {
-      sendJson(response, 401, { error: "Unauthorized" });
       return;
     }
 
