@@ -54,9 +54,11 @@ function extractSqlStatements(spans) {
 function normalizeTrace(trace, receivedAt) {
   const spans = Array.isArray(trace.spans) ? trace.spans : [];
   const rootSpan = spans.find((span) => !span.parentSpanId) || spans[0];
+  const sqlStatements = extractSqlStatements(spans);
 
   return {
     traceId: trace.traceId,
+    traceIdLower: (trace.traceId || "").toLowerCase(),
     appName: trace.appName,
     host: trace.host || "",
     timestamp: trace.timestamp || receivedAt,
@@ -66,7 +68,8 @@ function normalizeTrace(trace, receivedAt) {
     status: spans.reduce((max, span) => Math.max(max, span.status || 0), 0),
     uri: extractUri(spans),
     rootSpanName: rootSpan ? rootSpan.name : "unknown",
-    sqlStatements: extractSqlStatements(spans),
+    sqlStatements,
+    sqlStatementsLower: sqlStatements.map((sql) => sql.toLowerCase()),
     spans: spans.slice(0, 100)
   };
 }
@@ -387,7 +390,7 @@ export class ApmState extends EventEmitter {
 
     return source
       .filter((trace) => {
-        if (traceId && !trace.traceId.toLowerCase().includes(traceId)) {
+        if (traceId && !trace.traceIdLower.includes(traceId)) {
           return false;
         }
         if (uri && trace.uri !== uri) {
@@ -398,7 +401,7 @@ export class ApmState extends EventEmitter {
         }
         if (
           sql &&
-          !trace.sqlStatements.some((statement) => statement.toLowerCase().includes(sql))
+          !trace.sqlStatementsLower.some((statement) => statement.includes(sql))
         ) {
           return false;
         }
