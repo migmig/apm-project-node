@@ -14,10 +14,25 @@ const dataDir = path.join(rootDir, "data");
 const port = Number(process.env.PORT || 9900);
 const host = process.env.HOST || "127.0.0.1";
 const expectedApiKey = process.env.APM_API_KEY || "";
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 const storage = new JsonlStorage(dataDir);
 const state = new ApmState();
 const sseClients = new Set();
+
+function getValidatedOrigin(request) {
+  const origin = request.headers.origin;
+  if (!origin) {
+    return null;
+  }
+  if (allowedOrigins.includes(origin)) {
+    return origin;
+  }
+  return null;
+}
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -31,24 +46,38 @@ const mimeTypes = {
   ".woff2": "font/woff2"
 };
 
-function sendJson(response, statusCode, payload) {
-  response.writeHead(statusCode, {
+function sendJson(response, statusCode, payload, request = null) {
+  const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
-  });
+  };
+  if (request) {
+    const origin = getValidatedOrigin(request);
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Vary"] = "Origin";
+    }
+  }
+  response.writeHead(statusCode, headers);
   response.end(JSON.stringify(payload));
 }
 
-function sendText(response, statusCode, body) {
-  response.writeHead(statusCode, {
+function sendText(response, statusCode, body, request = null) {
+  const headers = {
     "Content-Type": "text/plain; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
-  });
+  };
+  if (request) {
+    const origin = getValidatedOrigin(request);
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Vary"] = "Origin";
+    }
+  }
+  response.writeHead(statusCode, headers);
   response.end(body);
 }
 
@@ -95,7 +124,7 @@ async function serveStatic(request, response, pathname) {
   const filePath = path.join(distDir, safePath);
 
   if (!filePath.startsWith(distDir)) {
-    sendText(response, 403, "Forbidden");
+    sendText(response, 403, "Forbidden", request);
     return;
   }
 
@@ -123,12 +152,12 @@ async function serveStatic(request, response, pathname) {
         response.end(content);
         return;
       } catch {
-        sendText(response, 404, "Frontend build not found. Run `npm run build` first.");
+        sendText(response, 404, "Frontend build not found. Run `npm run build` first.", request);
         return;
       }
     }
 
-    sendText(response, 404, "Not found");
+    sendText(response, 404, "Not found", request);
   }
 }
 
@@ -162,33 +191,43 @@ const server = http.createServer(async (request, response) => {
   const pathname = url.pathname;
 
   if (request.method === "OPTIONS") {
-    response.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
+    const headers = {
       "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
-    });
+    };
+    const origin = getValidatedOrigin(request);
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Vary"] = "Origin";
+    }
+    response.writeHead(204, headers);
     response.end();
     return;
   }
 
   try {
     if (pathname === "/health") {
-      sendJson(response, 200, { ok: true, timestamp: Date.now() });
+      sendJson(response, 200, { ok: true, timestamp: Date.now() }, request);
       return;
     }
 
     if (!authorized(request) && pathname.startsWith("/api/v1/")) {
-      sendJson(response, 401, { error: "Unauthorized" });
+      sendJson(response, 401, { error: "Unauthorized" }, request);
       return;
     }
 
     if (pathname === "/api/v1/stream" && request.method === "GET") {
-      response.writeHead(200, {
+      const headers = {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*"
-      });
+        Connection: "keep-alive"
+      };
+      const origin = getValidatedOrigin(request);
+      if (origin) {
+        headers["Access-Control-Allow-Origin"] = origin;
+        headers["Vary"] = "Origin";
+      }
+      response.writeHead(200, headers);
       response.write(`event: snapshot\ndata: ${JSON.stringify(state.snapshot())}\n\n`);
       sseClients.add(response);
       request.on("close", () => {
@@ -198,7 +237,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname === "/api/v1/dashboard" && request.method === "GET") {
-      sendJson(response, 200, state.snapshot());
+      sendJson(response, 200, state.snapshot(), request);
       return;
     }
 
@@ -213,7 +252,8 @@ const server = http.createServer(async (request, response) => {
           uri: url.searchParams.get("uri") || "",
           minDurationMs: url.searchParams.get("minDurationMs") || 0,
           limit: url.searchParams.get("limit") || 50
-        })
+        }),
+        request
       );
       return;
     }
@@ -223,10 +263,10 @@ const server = http.createServer(async (request, response) => {
       const appName = url.searchParams.get("appName") || "";
       const trace = state.traceDetail(appName, traceId);
       if (!trace) {
-        sendJson(response, 404, { error: "Trace not found" });
+        sendJson(response, 404, { error: "Trace not found" }, request);
         return;
       }
-      sendJson(response, 200, trace);
+      sendJson(response, 200, trace, request);
       return;
     }
 
@@ -236,10 +276,10 @@ const server = http.createServer(async (request, response) => {
       const traceId = decodeURIComponent(encodedTraceId || "");
       const trace = state.traceDetail(appName, traceId);
       if (!trace) {
-        sendJson(response, 404, { error: "Trace not found" });
+        sendJson(response, 404, { error: "Trace not found" }, request);
         return;
       }
-      sendJson(response, 200, trace);
+      sendJson(response, 200, trace, request);
       return;
     }
 
@@ -248,10 +288,10 @@ const server = http.createServer(async (request, response) => {
       const uri = url.searchParams.get("uri") || "";
       const detail = state.apiDetail(appName, uri);
       if (!detail) {
-        sendJson(response, 404, { error: "API detail not found" });
+        sendJson(response, 404, { error: "API detail not found" }, request);
         return;
       }
-      sendJson(response, 200, detail);
+      sendJson(response, 200, detail, request);
       return;
     }
 
@@ -264,7 +304,8 @@ const server = http.createServer(async (request, response) => {
           host: app.host,
           online: app.online,
           lastSeenAt: app.lastSeenAt
-        }))
+        })),
+        request
       );
       return;
     }
@@ -273,23 +314,23 @@ const server = http.createServer(async (request, response) => {
       const appName = decodeURIComponent(pathname.slice("/api/v1/apps/".length));
       const snapshot = state.appSnapshot(appName);
       if (!snapshot) {
-        sendJson(response, 404, { error: "App not found" });
+        sendJson(response, 404, { error: "App not found" }, request);
         return;
       }
-      sendJson(response, 200, snapshot);
+      sendJson(response, 200, snapshot, request);
       return;
     }
 
     if (pathname === "/api/v1/register" && request.method === "POST") {
       const body = await parseBody(request);
       if (!body || !body.appName) {
-        sendJson(response, 400, { error: "appName is required" });
+        sendJson(response, 400, { error: "appName is required" }, request);
         return;
       }
       const receivedAt = Date.now();
       state.register(body, receivedAt);
       await storage.append("register", { receivedAt, data: body }, receivedAt);
-      sendJson(response, 202, { ok: true });
+      sendJson(response, 202, { ok: true }, request);
       return;
     }
 
@@ -298,7 +339,7 @@ const server = http.createServer(async (request, response) => {
       const body = ensureArray(await parseBody(request), "metrics");
       state.ingestMetrics(body, receivedAt);
       await storage.append("metrics", { receivedAt, count: body.length, data: body }, receivedAt);
-      sendJson(response, 202, { ok: true, count: body.length });
+      sendJson(response, 202, { ok: true, count: body.length }, request);
       return;
     }
 
@@ -307,15 +348,20 @@ const server = http.createServer(async (request, response) => {
       const body = ensureArray(await parseBody(request), "traces");
       state.ingestTraces(body, receivedAt);
       await storage.append("traces", { receivedAt, count: body.length, data: body }, receivedAt);
-      sendJson(response, 202, { ok: true, count: body.length });
+      sendJson(response, 202, { ok: true, count: body.length }, request);
       return;
     }
 
     await serveStatic(request, response, pathname);
   } catch (error) {
-    sendJson(response, 500, {
-      error: error.message || "Internal server error"
-    });
+    sendJson(
+      response,
+      500,
+      {
+        error: error.message || "Internal server error"
+      },
+      request
+    );
   }
 });
 
