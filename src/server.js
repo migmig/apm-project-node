@@ -2,7 +2,7 @@ import http from "node:http";
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { JsonlStorage } from "./storage.js";
+import { JsonlStorage, dateStamp } from "./storage.js";
 import { ApmState } from "./state.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +18,64 @@ const expectedApiKey = process.env.APM_API_KEY || "";
 const storage = new JsonlStorage(dataDir);
 const state = new ApmState();
 const sseClients = new Set();
+const historyStateCache = new Map();
+
+async function loadStateForDate(dateStr) {
+  const newState = new ApmState();
+
+  try {
+    for await (const record of storage.readLines("register", dateStr)) {
+      newState.register(record.data, record.receivedAt);
+    }
+  } catch (err) {
+    if (err.code !== "ENOENT") console.error("Error loading register data:", err);
+  }
+
+  try {
+    for await (const record of storage.readLines("metrics", dateStr)) {
+      if (record.data && record.data.length > 0) {
+        newState.ingestMetrics(record.data, record.receivedAt);
+      }
+    }
+  } catch (err) {
+    if (err.code !== "ENOENT") console.error("Error loading metrics data:", err);
+  }
+
+  try {
+    for await (const record of storage.readLines("traces", dateStr)) {
+      if (record.data && record.data.length > 0) {
+        newState.ingestTraces(record.data, record.receivedAt);
+      }
+    }
+  } catch (err) {
+    if (err.code !== "ENOENT") console.error("Error loading traces data:", err);
+  }
+
+  return newState;
+}
+
+async function getTargetState(requestUrl) {
+  const queryDate = requestUrl.searchParams.get("date");
+  if (!queryDate) return state;
+
+  const todayStr = dateStamp(Date.now());
+  if (queryDate === todayStr) return state;
+
+  if (historyStateCache.has(queryDate)) {
+    return historyStateCache.get(queryDate);
+  }
+
+  const loadedState = await loadStateForDate(queryDate);
+
+  // Cache up to 3 days to avoid memory leak
+  if (historyStateCache.size >= 3) {
+    const oldestKey = historyStateCache.keys().next().value;
+    historyStateCache.delete(oldestKey);
+  }
+  historyStateCache.set(queryDate, loadedState);
+
+  return loadedState;
+}
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -198,15 +256,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname === "/api/v1/dashboard" && request.method === "GET") {
-      sendJson(response, 200, state.snapshot());
+      const targetState = await getTargetState(url);
+      sendJson(response, 200, targetState.snapshot());
       return;
     }
 
     if (pathname === "/api/v1/traces" && request.method === "GET") {
+      const targetState = await getTargetState(url);
       sendJson(
         response,
         200,
-        state.searchTraces({
+        targetState.searchTraces({
           appName: url.searchParams.get("appName") || "",
           traceId: url.searchParams.get("traceId") || "",
           sql: url.searchParams.get("sql") || "",
@@ -219,9 +279,10 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname.startsWith("/api/v1/traces/") && request.method === "GET") {
+      const targetState = await getTargetState(url);
       const traceId = decodeURIComponent(pathname.slice("/api/v1/traces/".length));
       const appName = url.searchParams.get("appName") || "";
-      const trace = state.traceDetail(appName, traceId);
+      const trace = targetState.traceDetail(appName, traceId);
       if (!trace) {
         sendJson(response, 404, { error: "Trace not found" });
         return;
@@ -231,10 +292,11 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname.startsWith("/api/v1/apps/") && pathname.includes("/traces/") && request.method === "GET") {
+      const targetState = await getTargetState(url);
       const [encodedAppName, encodedTraceId] = pathname.slice("/api/v1/apps/".length).split("/traces/");
       const appName = decodeURIComponent(encodedAppName || "");
       const traceId = decodeURIComponent(encodedTraceId || "");
-      const trace = state.traceDetail(appName, traceId);
+      const trace = targetState.traceDetail(appName, traceId);
       if (!trace) {
         sendJson(response, 404, { error: "Trace not found" });
         return;
@@ -244,9 +306,10 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname === "/api/v1/api-detail" && request.method === "GET") {
+      const targetState = await getTargetState(url);
       const appName = url.searchParams.get("appName") || "";
       const uri = url.searchParams.get("uri") || "";
-      const detail = state.apiDetail(appName, uri);
+      const detail = targetState.apiDetail(appName, uri);
       if (!detail) {
         sendJson(response, 404, { error: "API detail not found" });
         return;
@@ -256,10 +319,11 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname === "/api/v1/apps" && request.method === "GET") {
+      const targetState = await getTargetState(url);
       sendJson(
         response,
         200,
-        state.snapshot().apps.map((app) => ({
+        targetState.snapshot().apps.map((app) => ({
           appName: app.appName,
           host: app.host,
           online: app.online,
@@ -270,8 +334,9 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (pathname.startsWith("/api/v1/apps/") && request.method === "GET") {
+      const targetState = await getTargetState(url);
       const appName = decodeURIComponent(pathname.slice("/api/v1/apps/".length));
-      const snapshot = state.appSnapshot(appName);
+      const snapshot = targetState.appSnapshot(appName);
       if (!snapshot) {
         sendJson(response, 404, { error: "App not found" });
         return;
@@ -321,6 +386,10 @@ const server = http.createServer(async (request, response) => {
 
 async function start() {
   await storage.init();
+  const todayStr = dateStamp(Date.now());
+  const todayState = await loadStateForDate(todayStr);
+  Object.assign(state, todayState);
+
   server.listen(port, host, () => {
     console.log(`APM server listening on http://${host}:${port}`);
   });

@@ -22,9 +22,11 @@ export default function App() {
     runTraceSearch,
     selectedApiDetail,
     selectedApp,
+    selectedDate,
     selectedTraceDetail,
     setSelectedApiDetail,
     setSelectedApp,
+    setSelectedDate,
     setSqlFilters,
     setTraceFilters,
     sqlFilters,
@@ -36,7 +38,12 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-[1360px] px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
-      <HeroHeader connectionState={connectionState} generatedAt={dashboard?.generatedAt} />
+      <HeroHeader
+        connectionState={connectionState}
+        generatedAt={dashboard?.generatedAt}
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+      />
       <TabNav currentTab={currentTab} onChange={switchTab} />
 
       <main className="mt-5 flex flex-col gap-6">

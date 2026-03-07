@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { tabs } from "../constants/dashboard.js";
-import { formatNumber, formatTime } from "../lib/format.js";
+import { formatNumber, formatTime, dateStamp } from "../lib/format.js";
 import { fetchJson, withApiKey } from "../lib/fetch-json.js";
 
 function getHashTab() {
@@ -9,6 +9,7 @@ function getHashTab() {
 }
 
 export function useApmDashboard() {
+  const [selectedDate, setSelectedDate] = useState(dateStamp(Date.now()));
   const [dashboard, setDashboard] = useState(null);
   const [currentTab, setCurrentTab] = useState(getHashTab);
   const [connectionState, setConnectionState] = useState("connecting");
@@ -47,7 +48,12 @@ export function useApmDashboard() {
   }, []);
 
   async function fetchApiDetail(appName, uri) {
-    const detail = await fetchJson(`/api/v1/api-detail?appName=${encodeURIComponent(appName)}&uri=${encodeURIComponent(uri)}`);
+    const query = new URLSearchParams();
+    query.set("appName", appName);
+    query.set("uri", uri);
+    query.set("date", selectedDate);
+
+    const detail = await fetchJson(`/api/v1/api-detail?${query.toString()}`);
     startTransition(() => {
       setSelectedApiDetail(detail);
       setSelectedApp(appName);
@@ -56,8 +62,11 @@ export function useApmDashboard() {
   }
 
   async function fetchTraceDetail(appName, traceId) {
+    const query = new URLSearchParams();
+    query.set("date", selectedDate);
+
     const detail = await fetchJson(
-      `/api/v1/apps/${encodeURIComponent(appName)}/traces/${encodeURIComponent(traceId)}`
+      `/api/v1/apps/${encodeURIComponent(appName)}/traces/${encodeURIComponent(traceId)}?${query.toString()}`
     );
     startTransition(() => {
       setSelectedTraceDetail(detail);
@@ -73,6 +82,7 @@ export function useApmDashboard() {
       if (filters.minDurationMs) query.set("minDurationMs", filters.minDurationMs);
       if (filters.sql) query.set("sql", filters.sql);
       query.set("limit", "50");
+      query.set("date", selectedDate);
 
       const results = await fetchJson(`/api/v1/traces?${query.toString()}`);
       startTransition(() => {
@@ -93,6 +103,7 @@ export function useApmDashboard() {
       if (filters.minDurationMs) query.set("minDurationMs", filters.minDurationMs);
       if (filters.uri) query.set("uri", filters.uri);
       query.set("limit", "50");
+      query.set("date", selectedDate);
 
       const results = await fetchJson(`/api/v1/traces?${query.toString()}`);
       startTransition(() => {
@@ -145,7 +156,12 @@ export function useApmDashboard() {
 
     async function loadInitial() {
       try {
-        const data = await fetchJson("/api/v1/dashboard");
+        startTransition(() => {
+          setConnectionState(selectedDate === dateStamp(Date.now()) ? "connecting" : "historical");
+        });
+
+        const query = new URLSearchParams({ date: selectedDate });
+        const data = await fetchJson(`/api/v1/dashboard?${query.toString()}`);
 
         if (cancelled) {
           return;
@@ -153,7 +169,6 @@ export function useApmDashboard() {
 
         startTransition(() => {
           setDashboard(data);
-          setConnectionState("streaming");
           setSelectedApp((current) => current || data.apps[0]?.appName || "");
         });
 
@@ -170,9 +185,13 @@ export function useApmDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
+    if (selectedDate !== dateStamp(Date.now())) {
+      return;
+    }
+
     const stream = new EventSource(withApiKey("/api/v1/stream"));
 
     stream.addEventListener("snapshot", (event) => {
@@ -194,6 +213,10 @@ export function useApmDashboard() {
       setConnectionState("streaming");
     });
 
+    stream.onopen = () => {
+      setConnectionState("streaming");
+    };
+
     stream.onerror = () => {
       setConnectionState("reconnecting");
     };
@@ -201,7 +224,7 @@ export function useApmDashboard() {
     return () => {
       stream.close();
     };
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     if (!dashboard?.generatedAt || !selectedApiRef.current) {
@@ -249,9 +272,11 @@ export function useApmDashboard() {
     runTraceSearch,
     selectedApiDetail,
     selectedApp,
+    selectedDate,
     selectedTraceDetail,
     setSelectedApiDetail,
     setSelectedApp,
+    setSelectedDate,
     setSqlFilters,
     setTraceFilters,
     sqlFilters,

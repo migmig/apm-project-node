@@ -1,8 +1,15 @@
 import { mkdir, appendFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { createInterface } from "node:readline";
 import path from "node:path";
 
-function dateStamp(timestamp) {
-  return new Date(timestamp).toISOString().slice(0, 10);
+export function dateStamp(timestamp) {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export class JsonlStorage {
@@ -26,5 +33,33 @@ export class JsonlStorage {
       });
 
     return this.writeQueue;
+  }
+
+  async *readLines(kind, dateStr) {
+    const filePath = path.join(this.dataDir, `${kind}-${dateStr}.jsonl`);
+    let fileStream;
+
+    try {
+      fileStream = createReadStream(filePath, { encoding: "utf8" });
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return;
+      }
+      throw error;
+    }
+
+    const rl = createInterface({
+      input: fileStream,
+      crlfDelay: Infinity
+    });
+
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      try {
+        yield JSON.parse(line);
+      } catch (err) {
+        console.error(`Failed to parse ${kind} line`, err);
+      }
+    }
   }
 }
