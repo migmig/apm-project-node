@@ -321,9 +321,7 @@ const server = http.createServer(async (request, response) => {
 
 async function start() {
   await storage.init();
-  server.listen(port, host, () => {
-    console.log(`APM server listening on http://${host}:${port}`);
-  });
+  server.listen(port, host);
 }
 
 start().catch((error) => {
